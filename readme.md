@@ -1,3 +1,6 @@
+//Fixed a bug causing the general spotify sync to fail.
+
+
 A command line tool for importing your Spotify playlists into Tidal. Due to various performance optimisations, it is particularly suited for periodic synchronisation of very large collections.
 
 Installation
