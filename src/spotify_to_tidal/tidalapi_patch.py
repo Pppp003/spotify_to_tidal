@@ -1,5 +1,6 @@
 import asyncio
 import math
+import time
 from typing import List
 import tidalapi
 from tqdm import tqdm
@@ -17,18 +18,29 @@ def clear_tidal_playlist(playlist: tidalapi.UserPlaylist, chunk_size: int=20):
             indices = range(min(playlist.num_tracks, chunk_size))
             _remove_indices_from_playlist(playlist, indices)
             progress.update(len(indices))
-    
-def add_multiple_tracks_to_playlist(playlist: tidalapi.UserPlaylist, track_ids: List[int], chunk_size: int=20):
+
+def add_multiple_tracks_to_playlist(playlist: tidalapi.UserPlaylist, track_ids: List[int], chunk_size: int=10):
     offset = 0
     with tqdm(desc="Adding new tracks to Tidal playlist", total=len(track_ids)) as progress:
         while offset < len(track_ids):
             count = min(chunk_size, len(track_ids) - offset)
-            playlist.add(track_ids[offset:offset+chunk_size])
-            offset += count
-            progress.update(count)
+            # Filter out None or invalid track IDs
+            chunk = [tid for tid in track_ids[offset:offset+count] if tid is not None]
+            if not chunk:
+                offset += count
+                progress.update(count)
+                continue
+            try:
+                playlist.add(chunk)
+                offset += count
+                progress.update(count)
+                time.sleep(0.5)  # Add a small delay to avoid rate limiting
+            except Exception as e:
+                print(f"Failed to add chunk: {e}")
+                break
 
 async def _get_all_chunks(url, session, parser, params={}) -> List[tidalapi.Track]:
-    """ 
+    """
         Helper function to get all items from a Tidal endpoint in parallel
         The main library doesn't provide the total number of items or expose the raw json, so use this wrapper instead
     """
@@ -76,4 +88,3 @@ async def get_all_playlist_tracks(playlist: tidalapi.Playlist, chunk_size: int=2
     }
     print(f"Loading tracks from Tidal playlist '{playlist.name}'")
     return await _get_all_chunks(f"{playlist._base_url%playlist.id}/tracks", session=playlist.session, parser=playlist.session.parse_track, params=params)
-
